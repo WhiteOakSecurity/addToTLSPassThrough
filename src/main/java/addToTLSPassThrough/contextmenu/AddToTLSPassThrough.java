@@ -14,7 +14,7 @@ import burp.api.montoya.logging.Logging;
 import burp.api.montoya.extension.Extension;
 import burp.api.montoya.extension.ExtensionUnloadingHandler;
 
-public class ContextMenu implements BurpExtension
+public class AddToTLSPassThrough implements BurpExtension
 {
     private Logging logging;
     @Override

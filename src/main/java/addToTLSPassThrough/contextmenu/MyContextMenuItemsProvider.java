@@ -58,31 +58,12 @@ public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
             
             
             for(HttpRequestResponse requestResponse : requestResponses) {
-            //Extract host
-            //Need to extract all values.            
+                //Extract host values        
                 burp.api.montoya.http.HttpService requestService = requestResponse.httpService();
-                org.json.JSONObject singleHostJson = new JSONObject();
+                
                 
                 String host = requestService.host();
-                api.logging().logToOutput("host:" + host);
-                //don't save to singleHostJson - we'll do that in the loop in a second
-                String port = "^" + Integer.toString(requestService.port()) + "$";
-                singleHostJson.put("port", port);
-                api.logging().logToOutput("port:" + port);
-                String file = "^.*$"; //by default all files. If users want file specificity, it's recommended they use the paste feature in Settings.
-                singleHostJson.put("file",file);
-                api.logging().logToOutput("file:" + file);
-                
-                String protocol = "https";
-                singleHostJson.put("protocol",protocol);
-                api.logging().logToOutput("protocol:" + protocol);
-                
-                String enabled = "true";
-                singleHostJson.put("enabled", Boolean.parseBoolean(enabled));
-                api.logging().logToOutput("enabled:" + enabled);
-                
-                
-                String regex;
+
                 
                 //find number of subdomains
                 long domainCount = host.chars().filter(ch -> ch == '.').count();
@@ -91,21 +72,25 @@ public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
                 //3 = two.s.ubdomains.com
                 //4 = thr.e.e.subdomains.com
                 
-                String domainCountS = "" + domainCount;
+                //String domainCountS = "" + domainCount;
                 //api.logging().logToOutput(domainCountS);
                 
-                //For each level of subdomain, add a new rule to the RulesArray, which is then used to populate the context menu with options
+                //For each level of subdomain, add a new rule to the rulesArray, which is then used to populate the context menu with options
                 for(int i=(int) domainCount; i >= 1 ; i--) {
 
                     org.json.JSONObject newHostJson = new JSONObject();
                     newHostJson.put("port","^" + Integer.toString(requestService.port()) + "$");
                     newHostJson.put("protocol","https");
                     newHostJson.put("file","^.*$");
-                    newHostJson.put("enabled", Boolean.parseBoolean(enabled));
+                    newHostJson.put("enabled", Boolean.parseBoolean("true"));
+                    
+                    
                     if (i == (int) domainCount){
                         //this matches Burp's default paste-into-settings behavior in regard to host regex format
+                        //I.E., No wildcard for base hostname
                         newHostJson.put("host",("^" + host.replace(".", "\\.") + "$"));
                     } else {
+                        //Add wildcard to all other subdomain levels
                         newHostJson.put("host",("^.*\\." + host.replace(".", "\\.")       + "$"));
                     }
 
@@ -116,7 +101,7 @@ public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
                     host = host.substring(host.indexOf(".")).substring(1);  
                 }
 
-                api.logging().logToOutput("rules array after domainCount loop: "+ rulesArray.toString());
+                //api.logging().logToOutput("rules array after domainCount loop: "+ rulesArray.toString());
 
             }
             //create JMenuItems
@@ -166,13 +151,12 @@ public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
     public void addSingleToTlsPassthrough(org.json.JSONObject newTlsPassthrough){
         //get current TLS passthrough settings
         String fullPrefix = "{\"proxy\":{\"ssl_pass_through\":{\"rules\":";
-        String rulePrefix = "{\"enabled\":true,\"host\":\"";
-        String ruleSuffix = "\",\"protocol\":\"any\"}";
+        //String rulePrefix = "{\"enabled\":true,\"host\":\"";
+        //String ruleSuffix = "\",\"protocol\":\"any\"}";
         String fullSuffix = "}}}";
-        
-        //api.logging().logToOutput("in addSingleToTLSPassThrough(), here's newTLSPassThrough:"+ newTlsPassthrough.toString());
 
-        //Import current TLSPassthrough rules into new JSONArray. Burp always gives us the prefix as envelope, so we need to parse down to the rules themselves each time.
+
+        //Import current TLSPassthrough rules into new JSONArray. Burp always gives us the prefix/suffix JSON as envelope, so we need to parse down to the rules themselves each time.
         org.json.JSONObject burpRules = new org.json.JSONObject(api.burpSuite().exportProjectOptionsAsJson("proxy.ssl_pass_through.rules"));
         org.json.JSONArray rulesArray = burpRules.getJSONObject("proxy").getJSONObject("ssl_pass_through").getJSONArray("rules");
         
@@ -193,6 +177,7 @@ public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
             if (rule.getString("host").equals(newTlsPassthrough.getString("host")) && rule.getString("port").equals(newTlsPassthrough.getString("port"))) {
                 foundMatchingRule = true;
                 //Clear out file param
+                String originalRule = rule.toString();
                 rule.put("file", newTlsPassthrough.getString("file")); //always wildcard regex
                 //enable it
                 rule.put("enabled", true);
@@ -201,7 +186,9 @@ public class MyContextMenuItemsProvider implements ContextMenuItemsProvider
                 String importString = fullPrefix + rulesArray.toString() + fullSuffix;
                 //Write back.
                 
-                api.logging().logToOutput("Duplicate rule. executing importProject with the follwoing: " + importString);
+                //api.logging().logToOutput("Duplicate rule. Original rule: " + originalRule);
+                api.logging().logToOutput("executing importProject with the following: " + importString);
+                
                 api.burpSuite().importProjectOptionsFromJson(importString);
                 break;
             }
